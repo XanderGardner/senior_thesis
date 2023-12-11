@@ -1,0 +1,4 @@
+# ignore stored financial data from wrds
+*.csv
+*.txt
+*.pkl
