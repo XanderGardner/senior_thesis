@@ -182,6 +182,14 @@ class announcement_model:
 
 
 
+
+  ##### access functions #####
+
+  def year(self):
+    return float(self.time_n.year)
+
+
+
 ### the model_store class represents the total collection of all annoucement_models and provides cummulative analysis and access
 class model_store:
 
@@ -219,8 +227,15 @@ class model_store:
 
   ##### getter function #####
 
-  def get_models(self):
-    return self.models
+  def get_models(self, year=None):
+    if year == None:
+      return self.models
+    
+    models_out = []
+    for model in self.models:
+      if model.year() == year:
+        models_out.append(model)
+    return models_out
 
   ##### analysis functions #####
   

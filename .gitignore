@@ -2,3 +2,7 @@
 *.csv
 *.txt
 *.pkl
+
+# only store resulting data for safety
+!market_anns_map.pkl
+!active_market_anns_map.pkl

@@ -43,7 +43,7 @@ def get_market_anns_year_list(market_anns_map, selected_year):
   return market_anns_year_list
 
 def get_df_year(year):
-  df = pd.read_csv(f"./announcement_trades_csv/trades_{2023}.csv")
+  df = pd.read_csv(f"./announcement_trades_csv/trades_{year}.csv")
   df['TIME_M'] = pd.to_datetime(df['TIME_M'], format='%H:%M:%S.%f')
   df = df[['DATE', 'TIME_M', 'SYM_ROOT', 'SIZE', 'PRICE']]
   df.dropna(inplace=True)
@@ -71,8 +71,9 @@ if __name__ == "__main__":
   market_anns_list = get_market_anns_list(market_anns_map)
   active_market_anns_map = {}
 
-  # for year in range(2005, 2024):
-  for iteration_year in range(2023,2024):
+  # 2005: 82
+  # 2023: 30
+  for iteration_year in range(2005,2024):
     market_anns_list_year = get_market_anns_year_list(market_anns_map, iteration_year)
     df = get_df_year(iteration_year)
 
