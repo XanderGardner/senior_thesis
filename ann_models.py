@@ -26,7 +26,7 @@ class announcement_model:
     'PRICE': 'mean',
     'BID': 'mean',
     'ASK': 'mean'
-    }).reset_index()
+    }).reset_index().dropna()
     self.returns_df = self.construct_returns_df()
 
     self.mu_hat, self.sigma_squared_hat, self.j_hat = self.estimate_single_slow_jump_model()
@@ -80,9 +80,52 @@ class announcement_model:
     delta_t = (t_c - t_n).total_seconds() / BIN_UNIT_TIME_DIFF
     j_hat = np.log(s_t_c / s_t_n) - (mu_hat - (sigma_squared_hat * delta_t / 2))
 
+    if math.isnan(mu_hat):
+      raise ValueError(f"model failed: mu_hat is {mu_hat}")
+    if math.isnan(sigma_squared_hat):
+      raise ValueError(f"model failed: sigma_squared_hat is {sigma_squared_hat}")
+    if math.isnan(j_hat):
+      raise ValueError(f"model failed: j_hat is {j_hat}")
+    
     return float(mu_hat), float(sigma_squared_hat), float(j_hat) 
 
+  # get net dollar position of high frequency traders
+  def get_hft_dollar_position(self):
+    # get df of hft trades
+    hft_df = self.df[(self.df['DATETIME'] > self.time_n) & (self.df['DATETIME'] < self.time_h)]
+    hft_df['DOLLAR_VOLUME'] = hft_df["SIZE"] * hft_df["PRICE"]
 
+    # find dollar volume
+    hft_dollar_volume = hft_df[hft_df["TRADE_DIRECTION"] == "B"]["DOLLAR_VOLUME"].sum()
+    hft_dollar_volume -= hft_df[hft_df["TRADE_DIRECTION"] == "S"]["DOLLAR_VOLUME"].sum()
+    return hft_dollar_volume
+
+  # get dollar volume of trades by high frequency traders
+  def get_hft_dollar_volume(self):
+    # get df of hft trades
+    hft_df = self.df[(self.df['DATETIME'] > self.time_n) & (self.df['DATETIME'] < self.time_h)]
+    hft_df['DOLLAR_VOLUME'] = hft_df["SIZE"] * hft_df["PRICE"]
+
+    # find dollar volume
+    hft_dollar_volume = hft_df[hft_df["TRADE_DIRECTION"] == "B"]["DOLLAR_VOLUME"].sum()
+    hft_dollar_volume += hft_df[hft_df["TRADE_DIRECTION"] == "S"]["DOLLAR_VOLUME"].sum()
+    return hft_dollar_volume
+  
+  # get trade volume of trades by high frequency traders
+  def get_hft_trade_volume(self):
+    # get df of hft trades
+    hft_df = self.df[(self.df['DATETIME'] > self.time_n) & (self.df['DATETIME'] < self.time_h)]
+
+    # find trade volume
+    hft_trade_volume = (hft_df['TRADE_DIRECTION'] == 'B').sum()
+    hft_trade_volume += (hft_df['TRADE_DIRECTION'] == 'S').sum()
+    return hft_trade_volume
+  
+  # get profit for hft
+  def get_hft_profit(self):
+    hft_dollar_volume = self.get_hft_dollar_position()
+    profit = hft_dollar_volume * math.exp(self.j_hat) - hft_dollar_volume
+    return profit
 
 
   ##### simulation #####
@@ -173,10 +216,10 @@ class announcement_model:
     plt.axvline(x=self.time_h, color='blue', linestyle='--', label='Human Reaction Time')
     plt.axvline(x=self.time_c, color='violet', linestyle='--', label='Convergence Time')
 
-    plt.title(f'{self.ticker} TAQ Data in 1 Minute Bins')
+    plt.title(f'{self.ticker} Trade Prices in 1 Minute Bins')
     plt.xlabel('Datetime')
     plt.ylabel('USD')
-    plt.legend()
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1))
     plt.grid(True)
     plt.show()
 
@@ -187,6 +230,18 @@ class announcement_model:
 
   def year(self):
     return float(self.time_n.year)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -238,4 +293,8 @@ class model_store:
     return models_out
 
   ##### analysis functions #####
+
+
+  ##### total plot functions #####
+
   
