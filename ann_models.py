@@ -29,8 +29,8 @@ class announcement_model:
     }).reset_index().dropna()
     self.returns_df = self.construct_returns_df()
 
+    self.basic_mu1_hat, self.basic_mu2_hat, self.basic_sigma_squared_hat = self.estimate_slow_price_step_model()
     self.mu_hat, self.sigma_squared_hat, self.j_hat = self.estimate_single_slow_jump_model()
-
 
   def construct_df(self, taq_df):
 
@@ -121,12 +121,27 @@ class announcement_model:
     hft_trade_volume += (hft_df['TRADE_DIRECTION'] == 'S').sum()
     return hft_trade_volume
   
-  # get profit for hft
+  # get profit for hft under detailed model
   def get_hft_profit(self):
     hft_dollar_volume = self.get_hft_dollar_position()
     profit = hft_dollar_volume * math.exp(self.j_hat) - hft_dollar_volume
     return profit
 
+  # define contribution to be price change caused by HFT
+  def get_hft_price_change(self):
+    hft_df = self.df[(self.df['DATETIME'] > self.time_n) & (self.df['DATETIME'] < self.time_h)]
+    if len(hft_df.index) == 0:
+      return 0
+    return float(hft_df.iloc[-1]["PRICE"]) - float(hft_df.iloc[0]["PRICE"])
+
+  # modeled price change according to jump
+  def get_jump_price_change(self):
+    hft_df = self.df[(self.df['DATETIME'] > self.time_n)]
+    return (float(hft_df.iloc[0]["PRICE"]) * math.exp(self.j_hat)) - float(hft_df.iloc[0]["PRICE"])
+
+  # contribution provided / percent jump
+  def get_hft_contribution(self):
+    return self.get_hft_price_change() / self.get_jump_price_change()
 
   ##### simulation #####
 
@@ -146,7 +161,6 @@ class announcement_model:
         val = out[-1] * math.exp(exp + self.j_hat)
       out.append(val)
     return out
-
 
   ##### plotting #####
 
@@ -187,7 +201,6 @@ class announcement_model:
     plt.grid(True)
     plt.show()
 
-  
   # Line plot for prices, bids, and asks over time aggregated in bins
   def plot_bin(self):
     plt.plot(self.df_bin['DATETIME'], self.df_bin['PRICE'], label='Trade', color='black')
@@ -224,24 +237,46 @@ class announcement_model:
     plt.show()
 
 
+  ##### basic model function #####
+    
+  # contructor function for estimating model parameters
+  def estimate_slow_price_step_model(self):
+  # return basic_mu1_hat, basic_mu2_hat, and basic_sigma_squared_hat
+    prices_before = list(self.df[self.df['DATETIME'] < self.time_n]['PRICE'])
+    prices_after = list(self.df[self.df['DATETIME'] >= self.time_c]['PRICE'])
+    
+    basic_mu1_hat = sum(prices_before) / len(prices_before)
+    basic_mu2_hat = sum(prices_after) / len(prices_after)
+    m = len(prices_before) + len(prices_after)
+    basic_sigma_squared_hat = sum([(price - basic_mu1_hat) ** 2 for price in prices_before]) / m
+    basic_sigma_squared_hat += sum([(price - basic_mu2_hat) ** 2 for price in prices_after]) / m
+    
+    return basic_mu1_hat, basic_mu2_hat, basic_sigma_squared_hat
 
+  def plot_slow_price_step_model(self):
+    times_before = [self.df_bin['DATETIME'].iloc[0], self.time_n]
+    prices_before = [self.basic_mu1_hat, self.basic_mu1_hat]
+    times_after = [self.df_bin['DATETIME'].iloc[-1], self.time_c]
+    prices_after = [self.basic_mu2_hat, self.basic_mu2_hat]
+    
+    plt.plot(times_before, prices_before, label='Slow Price Step Model Expectation', color='blue')
+    plt.plot(times_after, prices_after, color='blue')
+    plt.plot(self.df_bin['DATETIME'], self.df_bin['PRICE'], label='Trade', color='black')
+    plt.axvline(x=self.time_n, color='orange', linestyle='--', label='Announcement Time')
+    plt.axvline(x=self.time_h, color='blue', linestyle='--', label='Human Reaction Time')
+    plt.axvline(x=self.time_c, color='violet', linestyle='--', label='Convergence Time')
+
+    plt.title(f'{self.ticker} Trade Prices in 1 Minute Bins')
+    plt.xlabel('Datetime')
+    plt.ylabel('USD')
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1))
+    plt.grid(True)
+    plt.show()
 
   ##### access functions #####
 
   def year(self):
     return float(self.time_n.year)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -291,10 +326,3 @@ class model_store:
       if model.year() == year:
         models_out.append(model)
     return models_out
-
-  ##### analysis functions #####
-
-
-  ##### total plot functions #####
-
-  
