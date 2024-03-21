@@ -14,11 +14,11 @@ class announcement_model:
 
   ##### constructor functions #####
 
-  def __init__(self, ticker, announcement_time, taq_df):
+  def __init__(self, ticker, announcement_time, taq_df, conv_time=None):
     self.ticker = ticker
     self.time_n = announcement_time
     self.time_h = self.time_n + timedelta(minutes=1)
-    self.time_c = self.time_n + timedelta(minutes=15)
+    self.time_c = self.time_n + timedelta(minutes=15) if conv_time is None else self.time_n + timedelta(minutes=conv_time)
     self.df = self.construct_df(taq_df)
 
     self.df_bin = self.df.resample(BIN_UNIT_TIME_DIFF_STR, on='DATETIME').agg({
@@ -314,6 +314,54 @@ class model_store:
                       ]
           if len(curr_df) > 0:
             self.models.append(announcement_model(ticker, curr_datetime, curr_df))
+
+  ##### getter function #####
+
+  def get_models(self, year=None):
+    if year == None:
+      return self.models
+    
+    models_out = []
+    for model in self.models:
+      if model.year() == year:
+        models_out.append(model)
+    return models_out
+
+
+
+### the fomc_model_store class represents the total collection of all annoucement_models for fomc minutes releases and provides cummulative analysis and access
+class fomc_model_store:
+
+  ##### constructor functions #####
+  def __init__(self):
+    self.models = []
+    self.construct_models()
+
+  # helper function for constructor to create the initial models
+  def construct_models(self):
+    # load from announcement_taq and select only valid floats
+    taq_all = pd.read_csv("./fomc_data/fomc_taq/taq_all.csv")
+    taq_all['DATETIME'] = pd.to_datetime(taq_all['DATETIME'])
+    taq_all['DATE'] = taq_all['DATETIME'].dt.strftime('%Y-%m-%d')
+    taq_all['TICKER'] = taq_all['TICKER'].astype('string')
+    
+    ann_dates = set()
+    with open('fomc_data/fomc_ann_times.txt', 'r') as file:
+      for line in file:
+          ann_dates.add(line.strip())
+
+    # create announcement_models for each minutes announcement
+    for date_str in ann_dates:
+      
+      curr_datetime =  pd.to_datetime(date_str + " 14:00:00.00")
+
+      curr_df = taq_all[
+                  (taq_all['TICKER'] == "SPY") & 
+                  (taq_all['DATE'] == date_str)
+                  ]
+      if len(curr_df) > 0:
+        self.models.append(announcement_model("SPY", curr_datetime, curr_df, conv_time=45))
+        
 
   ##### getter function #####
 
